@@ -164,7 +164,7 @@
 
         <div class="controls">
             <label for="imageLoader" class="file-label">
-                <i class="fas fa-upload"></i> 选择图片
+                选择图片
             </label>
             <input type="file" id="imageLoader" accept="image/*">
         </div>
@@ -192,11 +192,16 @@
         </div>
     </div>
 
-    <!-- 这是魔法发生的地方: 引入 AI 库 -->
-    <script type="module">
-        // 从 CDN 导入背景移除库
-        import removeBackground from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.3/dist/browser.es.js';
+    <!-- 
+      <<< 这里是关键的修复！ >>>
+      我们换了一种方式来加载 AI 库。
+      1. 先用一个普通的 <script> 标签加载库文件。
+      2. 然后在第二个 <script> 标签里写我们的逻辑。
+      这样就绕过了浏览器的安全限制。
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.3/dist/browser.js"></script>
 
+    <script>
         // 获取页面上的元素
         const imageLoader = document.getElementById('imageLoader');
         const originalPreview = document.getElementById('originalPreview');
@@ -243,13 +248,11 @@
 
             try {
                 // 这是最关键的一步: 调用 AI 库进行抠图
-                // 它返回的是一个 Blob 对象 (一种二进制文件)
+                // 注意：因为我们是全局引用的库，所以可以直接使用 removeBackground 函数
                 const blob = await removeBackground(file, {
-                    // (可选) 配置项，例如进度回调
                     progress: (key, current, total) => {
-                         // key can be 'downloading', 'processing'
                          const percent = Math.round((current / total) * 100);
-                         statusText.textContent = `正在${key === 'downloading' ? '下载模型' : '分析图像'}... ${percent}%`;
+                         statusText.textContent = `正在${key === 'download' ? '下载模型' : '分析图像'}... ${percent}%`;
                     }
                 });
 
@@ -261,7 +264,7 @@
 
                 // 准备下载按钮
                 downloadButton.href = resultUrl;
-                downloadButton.download = `${originalFileName}_transparent.png`; // 设置下载文件名
+                downloadButton.download = `${originalFileName}_transparent.png`;
                 downloadButton.classList.add('ready');
 
                 statusText.textContent = '处理完成！可以下载啦！';
@@ -271,10 +274,9 @@
                 statusText.textContent = '哎呀，出错了。请试试其他图片。';
                 alert('处理失败：' + error.message);
             } finally {
-                // 无论成功或失败，处理结束后都要重置状态
                 isProcessing = false;
                 spinner.style.display = 'none';
-                imageLoader.value = ''; // 允许用户再次选择相同文件
+                imageLoader.value = '';
             }
         }
     </script>
