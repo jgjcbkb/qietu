@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片批量切图工具 (选择下载版)</title>
-    <!-- 引入 JSZip 和 FileSaver 库 (依然保留，可选用) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/filesaver.min.js"></script>
+    <title>图片批量切图工具 (带预设版)</title>
+    <!-- 不再需要打包功能，可以注释掉或移除这两个库 -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/filesaver.min.js"></script> -->
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -20,28 +20,57 @@
         }
         h3 { border-bottom: 1px dashed #95a5a6; margin-top: 40px; }
         .controls {
-            display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;
+            display: flex; flex-wrap: wrap; gap: 15px; justify-content: center;
             align-items: center; padding: 20px; background-color: #ecf0f1;
             border-radius: 8px; margin-bottom: 20px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+        }
+        .control-group label {
+            font-weight: bold;
+            font-size: 14px;
         }
         input[type="file"] { display: none; }
         .file-label {
             background-color: #3498db; color: white; padding: 10px 15px;
             border-radius: 5px; cursor: pointer; transition: background-color 0.3s;
+            display: inline-block; /* 确保label有尺寸 */
+            text-align: center;
         }
         .file-label:hover { background-color: #2980b9; }
-        input[type="number"] {
-            width: 60px; padding: 10px; border: 1px solid #bdc3c7;
+        input[type="number"], #presetSelector {
+            width: 80px; padding: 10px; border: 1px solid #bdc3c7;
             border-radius: 5px; text-align: center;
         }
-        .action-button {
-            color: white; border: none; padding: 10px 20px; border-radius: 5px;
+        #presetSelector {
+            text-align-last: center; /* 兼容性写法 */
+        }
+        .action-button, .preset-button {
+            color: white; border: none; padding: 10px 15px; border-radius: 5px;
             cursor: pointer; font-size: 16px; font-weight: bold;
             transition: background-color 0.3s;
         }
         #splitButton { background-color: #2ecc71; }
         #splitButton:hover { background-color: #27ae60; }
         
+        /* 新增：预设按钮样式 */
+        .preset-controls {
+            display: flex;
+            gap: 5px;
+        }
+        .preset-button {
+            font-size: 12px;
+            padding: 5px 8px;
+            background-color: #95a5a6;
+        }
+        .preset-button:hover {
+            background-color: #7f8c8d;
+        }
+
         /* 下载按钮区域 */
         .download-controls {
             display: none; /* 默认隐藏 */
@@ -49,11 +78,9 @@
             margin-bottom: 20px; text-align: center;
             border: 1px solid #dee2e6;
         }
-        #downloadSelectedButton { background-color: #3498db; margin-right: 10px;}
+        #downloadSelectedButton { background-color: #3498db; }
         #downloadSelectedButton:hover { background-color: #2980b9; }
-        #downloadAllButton { background-color: #e67e22; }
-        #downloadAllButton:hover { background-color: #d35400; }
-        .action-button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .action-button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
 
         #selectAllContainer { margin-bottom: 15px; font-weight: bold; }
         #selectAllContainer input { margin-right: 8px; vertical-align: middle; }
@@ -66,40 +93,46 @@
         .grid-item { position: relative; border: 1px solid #ddd; overflow: hidden; }
         .grid-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-        /* 复选框样式 */
         .slice-checkbox {
             position: absolute; top: 8px; left: 8px; z-index: 10;
             width: 20px; height: 20px; cursor: pointer;
         }
-
-        .download-link {
-            /* 依然保留，用于单独下载和被脚本调用 */
-            display: none;
-        }
+        .download-link { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>图片批量切图工具 (选择下载版)</h1>
-    <p style="text-align: center;">切割后可勾选需要的图片，进行批量下载，或打包为ZIP。</p>
+    <h1>图片批量切图工具 (带预设版)</h1>
+    <p style="text-align: center;">切割后可勾选需要的图片，进行批量下载。</p>
 
-    <!-- ... (控件区域HTML没有变化) ... -->
     <div class="controls">
         <div class="control-group">
-            <label for="imageLoader" class="file-label">1. 选择图片 (可多选)</label>
+            <label for="imageLoader" class="file-label">1. 选择图片</label>
             <input type="file" id="imageLoader" accept="image/*" multiple>
         </div>
         <div class="control-group">
-            <label for="rows">2. 行数:</label>
+            <label for="rows">2. 行数</label>
             <input type="number" id="rows" value="3" min="1">
         </div>
         <div class="control-group">
-            <label for="cols">列数:</label>
+            <label for="cols">列数</label>
             <input type="number" id="cols" value="3" min="1">
         </div>
+        
+        <!-- 新增的预设功能区域 -->
+        <div class="control-group">
+            <label for="presetSelector">预设</label>
+            <select id="presetSelector">
+                <option value="">选择预设...</option>
+            </select>
+            <div class="preset-controls">
+                <button id="savePresetButton" class="preset-button">保存</button>
+                <button id="deletePresetButton" class="preset-button">删除</button>
+            </div>
+        </div>
+        
         <button id="splitButton" class="action-button" disabled>3. 开始切图</button>
     </div>
-
 
     <div class="preview-section" style="margin-top: 30px;">
         <h2>已选择的文件列表</h2>
@@ -108,42 +141,41 @@
 
     <div class="output-section" style="margin-top: 30px;">
         <h2>切图结果</h2>
-        <!-- 新增的下载控制区域 -->
         <div id="downloadControls" class="download-controls">
             <div id="selectAllContainer">
                 <input type="checkbox" id="selectAllCheckbox">
                 <label for="selectAllCheckbox">全选 / 全不选</label>
             </div>
             <button id="downloadSelectedButton" class="action-button">下载选中项</button>
-            <button id="downloadAllButton" class="action-button">打包为ZIP</button>
+            <!-- “打包为ZIP”按钮已移除 -->
         </div>
         <div id="outputContainer"></div>
     </div>
 
     <script>
-        // ... (大部分JS变量定义不变) ...
         const imageLoader = document.getElementById('imageLoader');
         const fileList = document.getElementById('fileList');
         const rowsInput = document.getElementById('rows');
         const colsInput = document.getElementById('cols');
         const splitButton = document.getElementById('splitButton');
         const outputContainer = document.getElementById('outputContainer');
-        
-        // 新增的DOM元素引用
         const downloadControls = document.getElementById('downloadControls');
         const downloadSelectedButton = document.getElementById('downloadSelectedButton');
-        const downloadAllButton = document.getElementById('downloadAllButton');
         const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        
+        // --- 新增：预设功能DOM元素 ---
+        const presetSelector = document.getElementById('presetSelector');
+        const savePresetButton = document.getElementById('savePresetButton');
+        const deletePresetButton = document.getElementById('deletePresetButton');
+        const PRESET_STORAGE_KEY = 'imageSlicerPresets';
 
         let loadedImages = [];
-        let allSlicesData = [];
 
         function sanitizeFilename(name) { return name.replace(/[\/\\?%*:|"<>]/g, '_'); }
         
-        // 文件加载逻辑不变
         imageLoader.addEventListener('change', (e) => {
             const files = e.target.files; if (files.length === 0) return;
-            loadedImages = []; allSlicesData = []; fileList.innerHTML = ''; outputContainer.innerHTML = '';
+            loadedImages = []; fileList.innerHTML = ''; outputContainer.innerHTML = '';
             downloadControls.style.display = 'none'; splitButton.disabled = true;
             splitButton.textContent = '加载图片中...'; let filesLoaded = 0; const totalFiles = files.length;
             Array.from(files).forEach(file => {
@@ -161,22 +193,24 @@
             });
         });
         
-        // 切图按钮逻辑
         splitButton.addEventListener('click', () => {
             if (loadedImages.length === 0) { alert('请先选择至少一张图片！'); return; }
             const rows = parseInt(rowsInput.value); const cols = parseInt(colsInput.value);
             if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) { alert('请输入有效的行数和列数！'); return; }
             
-            outputContainer.innerHTML = ''; allSlicesData = [];
-            loadedImages.forEach(sourceImage => splitImage(sourceImage, rows, cols));
+            outputContainer.innerHTML = '';
+            let hasSlices = false;
+            loadedImages.forEach(sourceImage => {
+                splitImage(sourceImage, rows, cols);
+                hasSlices = true;
+            });
             
-            if (allSlicesData.length > 0) {
-                downloadControls.style.display = 'block'; // 显示下载控制区
-                selectAllCheckbox.checked = false; // 重置全选框
+            if (hasSlices) {
+                downloadControls.style.display = 'block';
+                selectAllCheckbox.checked = false;
             }
         });
 
-        // 核心切图函数 (增加了复选框)
         function splitImage(sourceImage, rows, cols) {
             const resultWrapper = document.createElement('div');
             const resultTitle = document.createElement('h3'); resultTitle.textContent = `"${sourceImage.originalName}" 的切图结果`;
@@ -198,22 +232,16 @@
                     const dataUrl = canvas.toDataURL('image/png');
                     const sliceName = `slice_${r + 1}_${c + 1}.png`;
                     const fullDownloadName = `${baseFileName}_${sliceName}`;
-                    allSlicesData.push({ sliceName, folderName: baseFileName, data: dataUrl });
 
                     const gridItem = document.createElement('div'); gridItem.className = 'grid-item';
-                    
                     const imgElement = document.createElement('img'); imgElement.src = dataUrl;
-                    
-                    // 新增：复选框
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.className = 'slice-checkbox';
-                    
-                    // 新增：一个隐藏的下载链接，供脚本调用
                     const downloadLink = document.createElement('a');
                     downloadLink.href = dataUrl;
                     downloadLink.download = fullDownloadName;
-                    downloadLink.className = 'download-link'; // 隐藏
+                    downloadLink.className = 'download-link';
 
                     gridItem.appendChild(checkbox);
                     gridItem.appendChild(imgElement);
@@ -223,17 +251,14 @@
             }
         }
         
-        // --- 全新的下载逻辑 ---
+        // --- 下载与选择逻辑 ---
 
-        // 1. 全选/全不选 功能
         selectAllCheckbox.addEventListener('change', () => {
-            const allCheckboxes = document.querySelectorAll('.slice-checkbox');
-            allCheckboxes.forEach(cb => {
+            document.querySelectorAll('.slice-checkbox').forEach(cb => {
                 cb.checked = selectAllCheckbox.checked;
             });
         });
 
-        // 2. 下载选中项 功能
         downloadSelectedButton.addEventListener('click', () => {
             const checkedCheckboxes = document.querySelectorAll('.slice-checkbox:checked');
             if (checkedCheckboxes.length === 0) {
@@ -250,62 +275,90 @@
                     return;
                 }
                 const checkbox = checkedCheckboxes[i];
-                // 找到与复选框配对的隐藏下载链接并点击它
                 const link = checkbox.closest('.grid-item').querySelector('.download-link');
                 link.click();
                 i++;
-            }, 300); // 每隔 300 毫秒下载一个，避免浏览器拦截
+            }, 300);
+        });
+        
+        // --- 新增：预设功能逻辑 ---
+        
+        // 从 localStorage 加载预设
+        function loadPresets() {
+            const presets = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]');
+            presetSelector.innerHTML = '<option value="">选择预设...</option>'; // 重置
+            presets.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = `${preset.rows},${preset.cols}`;
+                option.textContent = preset.name;
+                presetSelector.appendChild(option);
+            });
+        }
+        
+        // 保存预设到 localStorage
+        function savePresets(presets) {
+            localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
+        }
+
+        // 预设选择器事件：选择后更新行列数
+        presetSelector.addEventListener('change', () => {
+            const selectedValue = presetSelector.value;
+            if (selectedValue) {
+                const [rows, cols] = selectedValue.split(',');
+                rowsInput.value = rows;
+                colsInput.value = cols;
+            }
         });
 
-        // 3. 打包为ZIP 功能 (依然保留，逻辑与之前修复版相同)
-        downloadAllButton.addEventListener('click', async () => {
-            const checkedSlices = [];
-            const checkedCheckboxes = document.querySelectorAll('.slice-checkbox:checked');
-            
-            // 如果用户有勾选，就只打包勾选的。如果没有勾选，就打包全部。
-            if(checkedCheckboxes.length > 0){
-                checkedCheckboxes.forEach((checkbox, index) => {
-                    const gridItem = checkbox.closest('.grid-item');
-                    // 通过DOM结构找到对应的数据 (需要一种方式关联)
-                    // 一个简单的方法是给 grid-item 添加 data-index
-                    // 让我们重构一下，在创建时就把数据关联好。
-                    // 这里我们用一种更简单的方式，直接从allSlicesData里筛选
-                     const allItems = Array.from(document.querySelectorAll('.grid-item'));
-                     const itemIndex = allItems.indexOf(gridItem);
-                     if(allSlicesData[itemIndex]) {
-                         checkedSlices.push(allSlicesData[itemIndex]);
-                     }
-                });
-            } else {
-                 if (allSlicesData.length === 0) { alert('没有可打包的图片。'); return; }
-                 // 默认打包全部
-                 checkedSlices.push(...allSlicesData);
-                 alert('您没有选择任何图片，将默认打包全部切片。');
+        // 保存按钮事件
+        savePresetButton.addEventListener('click', () => {
+            const rows = rowsInput.value;
+            const cols = colsInput.value;
+            if (parseInt(rows) <= 0 || parseInt(cols) <= 0) {
+                alert('请输入有效的行数和列数！');
+                return;
             }
 
-
-            downloadAllButton.disabled = true; downloadAllButton.textContent = '正在打包...';
-            try {
-                const zip = new JSZip(); const useFolders = loadedImages.length > 1;
-                checkedSlices.forEach(slice => {
-                    const parts = slice.data.split(','); if (parts.length !== 2) return;
-                    const base64Data = parts[1];
-                    const fileName = `${slice.folderName}_${slice.sliceName}`;
-                    if (useFolders) {
-                        zip.folder(slice.folderName).file(slice.sliceName, base64Data, { base64: true });
+            const presetName = prompt(`为预设命名 (例如 "3x3 网格"):`, `${rows}x${cols}`);
+            if (presetName) {
+                const presets = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]');
+                // 检查名称是否已存在，如果存在则更新，否则添加
+                const existingIndex = presets.findIndex(p => p.name === presetName);
+                if (existingIndex > -1) {
+                    if(confirm(`名为 "${presetName}" 的预设已存在，要覆盖它吗？`)){
+                        presets[existingIndex] = { name: presetName, rows, cols };
                     } else {
-                        zip.file(fileName, base64Data, { base64: true });
+                        return;
                     }
-                });
-                const content = await zip.generateAsync({ type: 'blob' });
-                saveAs(content, 'image_slices_selected.zip');
-            } catch (error) {
-                console.error("打包失败:", error);
-                alert("打包ZIP文件时出错。");
-            } finally {
-                downloadAllButton.disabled = false; downloadAllButton.textContent = '打包为ZIP';
+                } else {
+                    presets.push({ name: presetName, rows, cols });
+                }
+                savePresets(presets);
+                loadPresets(); // 重新加载下拉列表
+                alert(`预设 "${presetName}" 已保存！`);
             }
         });
+
+        // 删除按钮事件
+        deletePresetButton.addEventListener('click', () => {
+            const selectedIndex = presetSelector.selectedIndex;
+            if (selectedIndex <= 0) { // 索引0是 "选择预设..."
+                alert('请先从下拉列表中选择一个要删除的预设。');
+                return;
+            }
+            const selectedName = presetSelector.options[selectedIndex].textContent;
+            
+            if (confirm(`确定要删除预设 "${selectedName}" 吗？`)) {
+                let presets = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]');
+                presets = presets.filter(p => p.name !== selectedName);
+                savePresets(presets);
+                loadPresets(); // 重新加载
+                alert(`预设 "${selectedName}" 已删除。`);
+            }
+        });
+        
+        // 页面加载时自动执行一次加载预设
+        document.addEventListener('DOMContentLoaded', loadPresets);
     </script>
 </body>
 </html>
